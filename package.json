@@ -1,0 +1,13 @@
+{
+  "name": "sync-video",
+  "version": "1.0.0",
+  "description": "تماشای هم‌زمان ویدیو با دیگران (یوتیوب + چت + ایموجی)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
