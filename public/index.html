@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>🎬 سینمای هم‌زمان + یوتیوب</title>
+    <title>🎬 سینمای هم‌زمان</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -26,12 +26,6 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.8);
             border: 1px solid #2a2a44;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            color: #f0b90b;
-            margin-bottom: 16px;
-            font-size: 24px;
         }
         .step {
             background: #0e111f;
@@ -269,7 +263,6 @@
         @media (max-width: 550px) {
             body { padding: 6px; }
             .container { padding: 14px 10px 20px; border-radius: 20px; }
-            h1 { font-size: 20px; margin-bottom: 12px; }
             .step { padding: 12px; margin-bottom: 12px; }
             .input-group input { font-size: 14px; padding: 8px 14px; }
             .btn { padding: 8px 16px; font-size: 13px; }
@@ -297,7 +290,7 @@
 <body>
 
 <div class="container">
-    <h1>🎬 سینمای هم‌زمان + یوتیوب</h1>
+    <!-- تیتر حذف شد -->
 
     <div id="step1" class="step">
         <h3>📥 لینک ویدیو یا یوتیوب را وارد کنید</h3>
@@ -369,23 +362,25 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     // ================================================================
-    //  کلاینت سینمای هم‌زمان – نسخه Real-Time با تایم‌استمپ
+    //  کلاینت سینمای هم‌زمان – نسخه Real-Time با دقت بالا
     // ================================================================
 
     const socket = io();
     let roomId = null;
     let isHost = false;
     let videoUrl = null;
-    let isSyncing = false;         // جلوگیری از حلقه بازگشتی
+    let isSyncing = false;
     let username = 'کاربر' + Math.floor(Math.random() * 1000);
     let isYoutube = false;
     let youtubePlayer = null;
     let youtubeReady = false;
 
-    // ===== متغیرهای همگام‌سازی =====
-    let serverTimeOffset = 0;       // اختلاف زمان کلاینت با سرور (میلی‌ثانیه)
+    // ===== متغیرهای همگام‌سازی پیشرفته =====
+    let serverTimeOffset = 0;
     let lastSyncTime = 0;
     let syncInterval = null;
+    let lastServerState = null;
+    let syncCount = 0;
 
     // ===== المنت‌ها =====
     const videoInput = document.getElementById('videoInput');
@@ -543,20 +538,27 @@
     }
 
     // ================================================================
-    //  همگام‌سازی با تایم‌استمپ (تصحیح زمان)
+    //  همگام‌سازی حرفه‌ای با جبران تأخیر و RTT
     // ================================================================
 
-    function syncToServerTime(serverTime, serverCurrentTime, isPlaying) {
+    function preciseSync(serverTime, serverCurrentTime, isPlaying) {
         const now = performance.now();
-        // محاسبه اختلاف زمان سرور و کلاینت
-        const estimatedServerNow = serverTime + (now - lastSyncTime);
-        const offset = estimatedServerNow - now;
-        serverTimeOffset = offset;
-
-        // زمان هدف = زمان فعلی سرور + اختلاف
-        const targetTime = serverCurrentTime + (now - lastSyncTime) / 1000;
-        // محدود کردن به duration
         const duration = getDuration() || Infinity;
+
+        // محاسبه زمان دقیق سرور در لحظه حال
+        const elapsedSinceSync = (now - lastSyncTime) / 1000;
+        const estimatedServerTime = serverTime + elapsedSinceSync * 1000;
+
+        // تصحیح با میانگین متحرک (برای نرم‌تر شدن)
+        if (syncCount === 0) {
+            serverTimeOffset = estimatedServerTime - now;
+        } else {
+            serverTimeOffset = serverTimeOffset * 0.7 + (estimatedServerTime - now) * 0.3;
+        }
+        syncCount++;
+
+        // زمان هدف = زمان فعلی سرور + زمان سپری‌شده از آخرین همگام‌سازی
+        const targetTime = serverCurrentTime + elapsedSinceSync;
         const clampedTime = Math.min(targetTime, duration - 0.5);
 
         if (!isSyncing) {
@@ -567,13 +569,13 @@
             } else {
                 pauseVideo();
             }
-            setTimeout(() => { isSyncing = false; }, 200);
+            setTimeout(() => { isSyncing = false; }, 50);
         }
         updateUI();
     }
 
     // ================================================================
-    //  درخواست همگام‌سازی دوره‌ای (هر ۳ ثانیه)
+    //  درخواست همگام‌سازی دوره‌ای (هر ۱ ثانیه)
     // ================================================================
 
     function requestSync() {
@@ -585,9 +587,10 @@
     socket.on('sync-response', (data) => {
         const { currentTime, isPlaying, serverTime, clientTime } = data;
         const now = performance.now();
-        const rtt = now - clientTime; // تأخیر رفت و برگشت
+        const rtt = now - clientTime;
         const adjustedServerTime = serverTime + rtt / 2;
-        syncToServerTime(adjustedServerTime, currentTime, isPlaying);
+        lastSyncTime = now;
+        preciseSync(adjustedServerTime, currentTime, isPlaying);
     });
 
     // ================================================================
@@ -616,9 +619,9 @@
         await loadVideo(url);
         statusDisplay.innerHTML = `🎬 اتاق ساخته شد! کد: <span class="highlight">${roomId}</span>`;
 
-        // شروع همگام‌سازی دوره‌ای
         if (syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(requestSync, 3000);
+        syncInterval = setInterval(requestSync, 1000);
+        syncCount = 0;
     });
 
     // ================================================================
@@ -658,7 +661,8 @@
         statusDisplay.innerHTML = `⏳ در حال اتصال به اتاق <span class="highlight">${roomId}</span>...`;
 
         if (syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(requestSync, 3000);
+        syncInterval = setInterval(requestSync, 1000);
+        syncCount = 0;
     });
 
     // ================================================================
@@ -667,6 +671,7 @@
 
     socket.on('room-state', async (state) => {
         console.log('📦 وضعیت اتاق:', state);
+        lastServerState = state;
         if (state.videoUrl) {
             videoUrl = state.videoUrl;
             const currentIsYoutube = isYoutube;
@@ -678,9 +683,8 @@
                 videoPlayer.load();
             }
         }
-        // همگام‌سازی با تایم‌استمپ سرور
         lastSyncTime = performance.now();
-        syncToServerTime(state.serverTime, state.currentTime, state.isPlaying);
+        preciseSync(state.serverTime, state.currentTime, state.isPlaying);
         updateUI(state);
     });
 
@@ -688,22 +692,22 @@
         videoUrl = data.videoUrl;
         await loadVideo(videoUrl);
         lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, 0, false);
+        preciseSync(data.serverTime, data.currentTime || 0, false);
     });
 
     socket.on('play', (data) => {
         lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, true);
+        preciseSync(data.serverTime, data.time, true);
     });
 
     socket.on('pause', (data) => {
         lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, false);
+        preciseSync(data.serverTime, data.time, false);
     });
 
     socket.on('seek', (data) => {
         lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, false);
+        preciseSync(data.serverTime, data.time, false);
     });
 
     socket.on('user-count', (count) => {
@@ -847,7 +851,7 @@
         }
     })();
 
-    console.log('🎬 سینمای هم‌زمان Real-Time با تایم‌استمپ راه‌اندازی شد!');
+    console.log('🎬 سینمای هم‌زمان Real-Time با دقت بالا راه‌اندازی شد!');
 </script>
 </body>
 </html>
