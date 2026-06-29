@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>🎬 سینمای هم‌زمان + یوتیوب</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: #1a1a2e;
+            border-radius: 30px;
+            padding: 20px 16px 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border: 1px solid #2a2a44;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #f0b90b;
+            margin-bottom: 16px;
+            font-size: 24px;
+        }
+        .step {
+            background: #0e111f;
+            padding: 16px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #2a2a44;
+        }
+        .step h3 {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 30px;
+            border: 1px solid #3a3a5a;
+            background: #0a0a1a;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: 0.3s;
+            min-width: 120px;
+        }
+        .input-group input:focus {
+            border-color: #f0b90b;
+        }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+            background: #f0b90b;
+            color: #1a1a2e;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .btn:hover { transform: scale(1.04); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary {
+            background: #2a2a44;
+            color: #aaa;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .video-wrapper {
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 10px 0 6px;
+            position: relative;
+            aspect-ratio: 16/9;
+        }
+        video, #youtube-player {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+            border-radius: 16px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 6px 0 10px;
+        }
+        .controls .btn {
+            min-width: 60px;
+            padding: 8px 18px;
+            font-size: 13px;
+        }
+        .status {
+            text-align: center;
+            color: #888;
+            font-size: 13px;
+            margin: 8px 0;
+        }
+        .status .highlight {
+            color: #f0b90b;
+        }
+        .room-link-box {
+            background: #0e111f;
+            padding: 12px 16px;
+            border-radius: 30px;
+            border: 2px solid #f0b90b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0 8px;
+        }
+        .room-link-box.hidden { display: none; }
+        .room-link-box code {
+            color: #f0b90b;
+            font-size: 13px;
+            word-break: break-all;
+            background: #0a0a1a;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid #2a2a44;
+            flex: 1;
+            text-align: center;
+        }
+        .copy-btn {
+            background: #2a2a44;
+            color: #aaa;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .copy-btn:hover { background: #3a3a5a; color: #fff; }
+        .chat-container {
+            background: #0e111f;
+            border-radius: 20px;
+            border: 1px solid #2a2a44;
+            margin-top: 12px;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: #1a1a2e;
+            padding: 6px 14px;
+            color: #aaa;
+            font-size: 12px;
+            border-bottom: 1px solid #2a2a44;
+            display: flex;
+            justify-content: space-between;
+        }
+        .chat-messages {
+            height: 120px;
+            overflow-y: auto;
+            padding: 6px 12px;
+            font-size: 13px;
+            background: #0a0a1a;
+        }
+        .chat-messages::-webkit-scrollbar { width: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #f0b90b; border-radius: 10px; }
+        .chat-message {
+            padding: 3px 0;
+            border-bottom: 1px solid #1a1a2e;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .chat-message .username {
+            color: #f0b90b;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .chat-message .msg {
+            color: #ccc;
+            word-break: break-word;
+            flex: 1;
+        }
+        .chat-message .time {
+            color: #555;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 6px;
+            padding: 6px 10px 8px;
+            background: #0a0a1a;
+            border-top: 1px solid #2a2a44;
+        }
+        .chat-input-row input {
+            flex: 1;
+            padding: 8px 14px;
+            border-radius: 30px;
+            border: 1px solid #3a3a5a;
+            background: #0e111f;
+            color: #fff;
+            outline: none;
+            font-size: 14px;
+            min-width: 60px;
+        }
+        .chat-input-row input:focus { border-color: #f0b90b; }
+        .chat-input-row button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 30px;
+            background: #f0b90b;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .chat-input-row button:hover { background: #f5c542; }
+        .emoji-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 6px 10px 10px;
+            background: #0a0a1a;
+            border-top: 1px solid #1a1a2e;
+            flex-wrap: wrap;
+        }
+        .emoji-btn {
+            background: none;
+            border: none;
+            font-size: 26px;
+            cursor: pointer;
+            transition: 0.2s;
+            padding: 4px 10px;
+            border-radius: 30px;
+            background: #1a1a2e;
+            border: 1px solid #2a2a44;
+            line-height: 1.4;
+        }
+        .emoji-btn:hover {
+            transform: scale(1.25);
+            background: #2a2a44;
+            border-color: #f0b90b;
+        }
+        .emoji-btn:active { transform: scale(0.9); }
+        .hidden { display: none; }
+
+        @media (max-width: 550px) {
+            body { padding: 6px; }
+            .container { padding: 14px 10px 20px; border-radius: 20px; }
+            h1 { font-size: 20px; margin-bottom: 12px; }
+            .step { padding: 12px; margin-bottom: 12px; }
+            .input-group input { font-size: 14px; padding: 8px 14px; }
+            .btn { padding: 8px 16px; font-size: 13px; }
+            .room-link-box { padding: 10px 12px; }
+            .room-link-box code { font-size: 12px; }
+            .copy-btn { font-size: 12px; padding: 4px 12px; }
+            .controls .btn { min-width: 50px; padding: 6px 12px; font-size: 12px; }
+            .chat-messages { height: 100px; font-size: 12px; }
+            .chat-input-row input { font-size: 13px; padding: 6px 12px; }
+            .chat-input-row button { padding: 6px 14px; font-size: 13px; }
+            .video-wrapper { aspect-ratio: 16/9; }
+            .emoji-btn { font-size: 22px; padding: 2px 8px; }
+        }
+        @media (max-width: 400px) {
+            .container { padding: 10px 6px 16px; }
+            .input-group { gap: 6px; }
+            .input-group input { font-size: 13px; padding: 6px 10px; }
+            .btn { font-size: 12px; padding: 6px 12px; }
+            .controls { gap: 6px; }
+            .controls .btn { font-size: 11px; padding: 5px 10px; min-width: 40px; }
+            .emoji-btn { font-size: 20px; padding: 2px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎬 سینمای هم‌زمان + یوتیوب</h1>
+
+    <div id="step1" class="step">
+        <h3>📥 لینک ویدیو یا یوتیوب را وارد کنید</h3>
+        <div class="input-group">
+            <input type="text" id="videoInput" placeholder="مثال: https://youtu.be/... یا https://example.com/video.mp4" />
+            <button class="btn" id="createRoomBtn">🚀 ساخت اتاق</button>
+        </div>
+    </div>
+
+    <div id="roomLinkBox" class="room-link-box hidden">
+        <span style="color:#aaa; font-size:13px;">🔗 لینک اتاق:</span>
+        <code id="roomLinkDisplay"></code>
+        <button class="copy-btn" id="copyBtn">📋 کپی</button>
+    </div>
+
+    <div id="step2" class="step">
+        <h3>🔗 یا با کد اتاق وارد شوید</h3>
+        <div class="input-group">
+            <input type="text" id="roomInput" placeholder="کد اتاق (مثلاً abc123)" />
+            <button class="btn" id="joinRoomBtn">🔓 ورود</button>
+        </div>
+    </div>
+
+    <div id="playerSection" class="hidden">
+        <div class="video-wrapper" id="videoWrapper">
+            <video id="videoPlayer" controls controlsList="nodownload" disablePictureInPicture style="display:none;"></video>
+            <div id="youtube-player" style="display:none;"></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="playBtn">▶ پلی</button>
+            <button class="btn btn-secondary" id="pauseBtn">⏸ استپ</button>
+            <button class="btn btn-secondary" id="backBtn">⏪ ۵-</button>
+            <button class="btn btn-secondary" id="forwardBtn">⏩ ۵+</button>
+        </div>
+
+        <div class="status" id="statusDisplay">
+            👥 <span id="userCount">۰</span> نفر آنلاین | 
+            ⏱ <span id="timeDisplay">۰۰:۰۰</span>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <span>💬 چت اتاق</span>
+                <span id="chatUserCount">۰</span>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-message" style="color:#666; justify-content:center;">به چت خوش آمدید!</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chatInput" placeholder="پیام خود را بنویس..." maxlength="200" />
+                <button id="sendChatBtn">📤</button>
+            </div>
+            <div class="emoji-row">
+                <button class="emoji-btn" data-emoji="❤️">❤️</button>
+                <button class="emoji-btn" data-emoji="😂">😂</button>
+                <button class="emoji-btn" data-emoji="🤣">🤣</button>
+                <button class="emoji-btn" data-emoji="😱">😱</button>
+                <button class="emoji-btn" data-emoji="😢">😢</button>
+            </div>
+        </div>
+
+        <div style="text-align:center; margin-top:10px;">
+            <button class="btn btn-danger" id="leaveBtn">🚪 خروج از اتاق</button>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    // ================================================================
+    //  کلاینت سینمای هم‌زمان – نسخه Real-Time با تایم‌استمپ
+    // ================================================================
+
+    const socket = io();
+    let roomId = null;
+    let isHost = false;
+    let videoUrl = null;
+    let isSyncing = false;         // جلوگیری از حلقه بازگشتی
+    let username = 'کاربر' + Math.floor(Math.random() * 1000);
+    let isYoutube = false;
+    let youtubePlayer = null;
+    let youtubeReady = false;
+
+    // ===== متغیرهای همگام‌سازی =====
+    let serverTimeOffset = 0;       // اختلاف زمان کلاینت با سرور (میلی‌ثانیه)
+    let lastSyncTime = 0;
+    let syncInterval = null;
+
+    // ===== المنت‌ها =====
+    const videoInput = document.getElementById('videoInput');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const roomLinkBox = document.getElementById('roomLinkBox');
+    const roomLinkDisplay = document.getElementById('roomLinkDisplay');
+    const copyBtn = document.getElementById('copyBtn');
+    const roomInput = document.getElementById('roomInput');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const playerSection = document.getElementById('playerSection');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const youtubePlayerDiv = document.getElementById('youtube-player');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const backBtn = document.getElementById('backBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const leaveBtn = document.getElementById('leaveBtn');
+    const statusDisplay = document.getElementById('statusDisplay');
+    const userCount = document.getElementById('userCount');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const chatUserCount = document.getElementById('chatUserCount');
+
+    // ================================================================
+    //  توابع تشخیص یوتیوب و بارگذاری API
+    // ================================================================
+
+    function isYoutubeUrl(url) {
+        return url.includes('youtube.com') || url.includes('youtu.be');
+    }
+
+    function extractYoutubeId(url) {
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
+    function loadYouTubeAPI() {
+        if (typeof YT !== 'undefined' && YT.Player) return Promise.resolve();
+        return new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = 'https://www.youtube.com/iframe_api';
+            script.onload = () => {
+                window.onYouTubeIframeAPIReady = () => resolve();
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function initYoutubePlayer(videoId) {
+        await loadYouTubeAPI();
+        return new Promise((resolve) => {
+            youtubePlayer = new YT.Player('youtube-player', {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: {
+                    controls: 1,
+                    modestbranding: 1,
+                    rel: 0,
+                    disablekb: 0,
+                    fs: 1,
+                },
+                events: {
+                    onReady: () => {
+                        youtubeReady = true;
+                        resolve(youtubePlayer);
+                    },
+                    onStateChange: (event) => {
+                        if (!isSyncing && roomId) {
+                            const state = event.data;
+                            const currentTime = youtubePlayer.getCurrentTime();
+                            if (state === YT.PlayerState.PLAYING) {
+                                socket.emit('play', { roomId, time: currentTime });
+                            } else if (state === YT.PlayerState.PAUSED) {
+                                socket.emit('pause', { roomId, time: currentTime });
+                            }
+                        }
+                    },
+                }
+            });
+        });
+    }
+
+    // ================================================================
+    //  بارگذاری ویدیو (تشخیص نوع)
+    // ================================================================
+
+    async function loadVideo(url) {
+        isYoutube = isYoutubeUrl(url);
+        videoPlayer.style.display = 'none';
+        youtubePlayerDiv.style.display = 'none';
+
+        if (isYoutube) {
+            const videoId = extractYoutubeId(url);
+            if (!videoId) {
+                alert('لینک یوتیوب معتبر نیست!');
+                return false;
+            }
+            youtubePlayerDiv.style.display = 'block';
+            await initYoutubePlayer(videoId);
+            return true;
+        } else {
+            videoPlayer.style.display = 'block';
+            videoPlayer.src = url;
+            videoPlayer.load();
+            return true;
+        }
+    }
+
+    // ================================================================
+    //  کنترل‌های پخش (مشترک)
+    // ================================================================
+
+    function playVideo() {
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.playVideo();
+        } else {
+            videoPlayer.play();
+        }
+    }
+
+    function pauseVideo() {
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.pauseVideo();
+        } else {
+            videoPlayer.pause();
+        }
+    }
+
+    function seekVideo(time) {
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.seekTo(time, true);
+        } else {
+            videoPlayer.currentTime = time;
+        }
+    }
+
+    function getCurrentTime() {
+        if (isYoutube && youtubePlayer) {
+            return youtubePlayer.getCurrentTime() || 0;
+        }
+        return videoPlayer.currentTime || 0;
+    }
+
+    function getDuration() {
+        if (isYoutube && youtubePlayer) {
+            return youtubePlayer.getDuration() || 0;
+        }
+        return videoPlayer.duration || 0;
+    }
+
+    // ================================================================
+    //  همگام‌سازی با تایم‌استمپ (تصحیح زمان)
+    // ================================================================
+
+    function syncToServerTime(serverTime, serverCurrentTime, isPlaying) {
+        const now = performance.now();
+        // محاسبه اختلاف زمان سرور و کلاینت
+        const estimatedServerNow = serverTime + (now - lastSyncTime);
+        const offset = estimatedServerNow - now;
+        serverTimeOffset = offset;
+
+        // زمان هدف = زمان فعلی سرور + اختلاف
+        const targetTime = serverCurrentTime + (now - lastSyncTime) / 1000;
+        // محدود کردن به duration
+        const duration = getDuration() || Infinity;
+        const clampedTime = Math.min(targetTime, duration - 0.5);
+
+        if (!isSyncing) {
+            isSyncing = true;
+            seekVideo(clampedTime);
+            if (isPlaying) {
+                playVideo().catch(e => {});
+            } else {
+                pauseVideo();
+            }
+            setTimeout(() => { isSyncing = false; }, 200);
+        }
+        updateUI();
+    }
+
+    // ================================================================
+    //  درخواست همگام‌سازی دوره‌ای (هر ۳ ثانیه)
+    // ================================================================
+
+    function requestSync() {
+        if (!roomId) return;
+        const clientTime = performance.now();
+        socket.emit('sync-request', { roomId, clientTime });
+    }
+
+    socket.on('sync-response', (data) => {
+        const { currentTime, isPlaying, serverTime, clientTime } = data;
+        const now = performance.now();
+        const rtt = now - clientTime; // تأخیر رفت و برگشت
+        const adjustedServerTime = serverTime + rtt / 2;
+        syncToServerTime(adjustedServerTime, currentTime, isPlaying);
+    });
+
+    // ================================================================
+    //  ساخت اتاق
+    // ================================================================
+
+    createRoomBtn.addEventListener('click', async () => {
+        const url = videoInput.value.trim();
+        if (!url) { alert('لطفاً یک لینک ویدیو معتبر وارد کنید.'); return; }
+        const newRoomId = Math.random().toString(36).substring(2, 8);
+        roomId = newRoomId;
+        videoUrl = url;
+        isHost = true;
+
+        socket.emit('join-room', roomId);
+        socket.emit('set-video', { roomId, videoUrl });
+
+        const fullLink = `${window.location.origin}?room=${roomId}`;
+        roomLinkDisplay.textContent = fullLink;
+        roomLinkBox.classList.remove('hidden');
+
+        step1.style.display = 'none';
+        step2.style.display = 'none';
+        playerSection.classList.remove('hidden');
+
+        await loadVideo(url);
+        statusDisplay.innerHTML = `🎬 اتاق ساخته شد! کد: <span class="highlight">${roomId}</span>`;
+
+        // شروع همگام‌سازی دوره‌ای
+        if (syncInterval) clearInterval(syncInterval);
+        syncInterval = setInterval(requestSync, 3000);
+    });
+
+    // ================================================================
+    //  کپی لینک
+    // ================================================================
+
+    copyBtn.addEventListener('click', () => {
+        const link = roomLinkDisplay.textContent;
+        if (!link) return;
+        navigator.clipboard.writeText(link).then(() => {
+            alert('✅ لینک کپی شد!');
+        }).catch(() => {
+            const range = document.createRange();
+            range.selectNode(roomLinkDisplay);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            alert('✅ لینک کپی شد!');
+        });
+    });
+
+    // ================================================================
+    //  ورود با کد
+    // ================================================================
+
+    joinRoomBtn.addEventListener('click', async () => {
+        const code = roomInput.value.trim();
+        if (!code) { alert('لطفاً کد اتاق را وارد کنید.'); return; }
+        roomId = code;
+        isHost = false;
+        socket.emit('join-room', roomId);
+
+        step1.style.display = 'none';
+        step2.style.display = 'none';
+        playerSection.classList.remove('hidden');
+
+        statusDisplay.innerHTML = `⏳ در حال اتصال به اتاق <span class="highlight">${roomId}</span>...`;
+
+        if (syncInterval) clearInterval(syncInterval);
+        syncInterval = setInterval(requestSync, 3000);
+    });
+
+    // ================================================================
+    //  رویدادهای Socket
+    // ================================================================
+
+    socket.on('room-state', async (state) => {
+        console.log('📦 وضعیت اتاق:', state);
+        if (state.videoUrl) {
+            videoUrl = state.videoUrl;
+            const currentIsYoutube = isYoutube;
+            const newIsYoutube = isYoutubeUrl(videoUrl);
+            if (newIsYoutube !== currentIsYoutube || (newIsYoutube && !youtubePlayer)) {
+                await loadVideo(videoUrl);
+            } else if (!newIsYoutube && videoPlayer.src !== videoUrl) {
+                videoPlayer.src = videoUrl;
+                videoPlayer.load();
+            }
+        }
+        // همگام‌سازی با تایم‌استمپ سرور
+        lastSyncTime = performance.now();
+        syncToServerTime(state.serverTime, state.currentTime, state.isPlaying);
+        updateUI(state);
+    });
+
+    socket.on('video-set', async (data) => {
+        videoUrl = data.videoUrl;
+        await loadVideo(videoUrl);
+        lastSyncTime = performance.now();
+        syncToServerTime(data.serverTime, 0, false);
+    });
+
+    socket.on('play', (data) => {
+        lastSyncTime = performance.now();
+        syncToServerTime(data.serverTime, data.time, true);
+    });
+
+    socket.on('pause', (data) => {
+        lastSyncTime = performance.now();
+        syncToServerTime(data.serverTime, data.time, false);
+    });
+
+    socket.on('seek', (data) => {
+        lastSyncTime = performance.now();
+        syncToServerTime(data.serverTime, data.time, false);
+    });
+
+    socket.on('user-count', (count) => {
+        userCount.textContent = count;
+        chatUserCount.textContent = count;
+    });
+
+    // ================================================================
+    //  پیام‌های چت
+    // ================================================================
+
+    socket.on('chat-message', (data) => {
+        const div = document.createElement('div');
+        div.className = 'chat-message';
+        div.innerHTML = `
+            <span class="username">${data.username}</span>
+            <span class="msg">${data.message}</span>
+            <span class="time">${data.time}</span>
+        `;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (chatMessages.children.length > 50) {
+            chatMessages.removeChild(chatMessages.firstChild);
+        }
+    });
+
+    // ================================================================
+    //  رویدادهای ویدیو (برای نوع معمولی)
+    // ================================================================
+
+    videoPlayer.addEventListener('play', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('play', { roomId, time: videoPlayer.currentTime });
+        }
+    });
+    videoPlayer.addEventListener('pause', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('pause', { roomId, time: videoPlayer.currentTime });
+        }
+    });
+    videoPlayer.addEventListener('seeked', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('seek', { roomId, time: videoPlayer.currentTime });
+        }
+        updateUI();
+    });
+    videoPlayer.addEventListener('timeupdate', () => {
+        updateUI();
+    });
+
+    // ================================================================
+    //  دکمه‌ها
+    // ================================================================
+
+    playBtn.addEventListener('click', playVideo);
+    pauseBtn.addEventListener('click', pauseVideo);
+    backBtn.addEventListener('click', () => {
+        const t = Math.max(0, getCurrentTime() - 5);
+        seekVideo(t);
+        if (roomId) socket.emit('seek', { roomId, time: t });
+    });
+    forwardBtn.addEventListener('click', () => {
+        const t = Math.min(getDuration() || 0, getCurrentTime() + 5);
+        seekVideo(t);
+        if (roomId) socket.emit('seek', { roomId, time: t });
+    });
+
+    leaveBtn.addEventListener('click', () => {
+        if (confirm('آیا مطمئن هستید که می‌خواهید از اتاق خارج شوید؟')) {
+            if (syncInterval) clearInterval(syncInterval);
+            socket.disconnect();
+            location.reload();
+        }
+    });
+
+    // ================================================================
+    //  چت (متن و ایموجی)
+    // ================================================================
+
+    function sendChatMessage(message) {
+        const msg = message || chatInput.value.trim();
+        if (!msg || !roomId) return;
+        socket.emit('chat-message', {
+            roomId,
+            username,
+            message: msg,
+            time: new Date().toLocaleTimeString('fa-IR')
+        });
+        chatInput.value = '';
+    }
+
+    sendChatBtn.addEventListener('click', () => sendChatMessage());
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+
+    document.querySelectorAll('.emoji-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const emoji = btn.dataset.emoji;
+            if (roomId) {
+                socket.emit('chat-message', {
+                    roomId,
+                    username,
+                    message: emoji,
+                    time: new Date().toLocaleTimeString('fa-IR')
+                });
+            }
+        });
+    });
+
+    // ================================================================
+    //  به‌روزرسانی UI
+    // ================================================================
+
+    function updateUI(state) {
+        const time = getCurrentTime();
+        timeDisplay.textContent = formatTime(time);
+        if (state && state.users) {
+            userCount.textContent = state.users.length || 0;
+            chatUserCount.textContent = state.users.length || 0;
+        }
+    }
+
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    // ================================================================
+    //  ورود مستقیم از لینک
+    // ================================================================
+
+    (function checkUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const roomFromUrl = params.get('room');
+        if (roomFromUrl) {
+            roomInput.value = roomFromUrl;
+            joinRoomBtn.click();
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    })();
+
+    console.log('🎬 سینمای هم‌زمان Real-Time با تایم‌استمپ راه‌اندازی شد!');
+</script>
+</body>
+</html>
