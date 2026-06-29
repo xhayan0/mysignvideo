@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>🎬 سینمای هم‌زمان + یوتیوب</title>
+    <title>🎬 سینمای هم‌زمان</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -26,12 +26,6 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.8);
             border: 1px solid #2a2a44;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            color: #f0b90b;
-            margin-bottom: 16px;
-            font-size: 24px;
         }
         .step {
             background: #0e111f;
@@ -269,7 +263,6 @@
         @media (max-width: 550px) {
             body { padding: 6px; }
             .container { padding: 14px 10px 20px; border-radius: 20px; }
-            h1 { font-size: 20px; margin-bottom: 12px; }
             .step { padding: 12px; margin-bottom: 12px; }
             .input-group input { font-size: 14px; padding: 8px 14px; }
             .btn { padding: 8px 16px; font-size: 13px; }
@@ -297,7 +290,7 @@
 <body>
 
 <div class="container">
-    <h1>🎬 سینمای هم‌زمان + یوتیوب</h1>
+    <!-- تیتر حذف شده -->
 
     <div id="step1" class="step">
         <h3>📥 لینک ویدیو یا یوتیوب را وارد کنید</h3>
@@ -369,23 +362,16 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     // ================================================================
-    //  کلاینت سینمای هم‌زمان – نسخه Real-Time با تایم‌استمپ
+    //  کلاینت ساده – فقط ارسال و دریافت رویدادها
     // ================================================================
 
     const socket = io();
     let roomId = null;
-    let isHost = false;
-    let videoUrl = null;
-    let isSyncing = false;         // جلوگیری از حلقه بازگشتی
     let username = 'کاربر' + Math.floor(Math.random() * 1000);
     let isYoutube = false;
     let youtubePlayer = null;
     let youtubeReady = false;
-
-    // ===== متغیرهای همگام‌سازی =====
-    let serverTimeOffset = 0;       // اختلاف زمان کلاینت با سرور (میلی‌ثانیه)
-    let lastSyncTime = 0;
-    let syncInterval = null;
+    let isSyncing = false; // جلوگیری از حلقه
 
     // ===== المنت‌ها =====
     const videoInput = document.getElementById('videoInput');
@@ -414,7 +400,7 @@
     const chatUserCount = document.getElementById('chatUserCount');
 
     // ================================================================
-    //  توابع تشخیص یوتیوب و بارگذاری API
+    //  توابع یوتیوب
     // ================================================================
 
     function isYoutubeUrl(url) {
@@ -461,11 +447,11 @@
                     onStateChange: (event) => {
                         if (!isSyncing && roomId) {
                             const state = event.data;
-                            const currentTime = youtubePlayer.getCurrentTime();
+                            const time = youtubePlayer.getCurrentTime();
                             if (state === YT.PlayerState.PLAYING) {
-                                socket.emit('play', { roomId, time: currentTime });
+                                socket.emit('video-play', { roomId, time });
                             } else if (state === YT.PlayerState.PAUSED) {
-                                socket.emit('pause', { roomId, time: currentTime });
+                                socket.emit('video-pause', { roomId, time });
                             }
                         }
                     },
@@ -473,10 +459,6 @@
             });
         });
     }
-
-    // ================================================================
-    //  بارگذاری ویدیو (تشخیص نوع)
-    // ================================================================
 
     async function loadVideo(url) {
         isYoutube = isYoutubeUrl(url);
@@ -501,32 +483,8 @@
     }
 
     // ================================================================
-    //  کنترل‌های پخش (مشترک)
+    //  توابع کمکی
     // ================================================================
-
-    function playVideo() {
-        if (isYoutube && youtubePlayer) {
-            youtubePlayer.playVideo();
-        } else {
-            videoPlayer.play();
-        }
-    }
-
-    function pauseVideo() {
-        if (isYoutube && youtubePlayer) {
-            youtubePlayer.pauseVideo();
-        } else {
-            videoPlayer.pause();
-        }
-    }
-
-    function seekVideo(time) {
-        if (isYoutube && youtubePlayer) {
-            youtubePlayer.seekTo(time, true);
-        } else {
-            videoPlayer.currentTime = time;
-        }
-    }
 
     function getCurrentTime() {
         if (isYoutube && youtubePlayer) {
@@ -542,53 +500,16 @@
         return videoPlayer.duration || 0;
     }
 
-    // ================================================================
-    //  همگام‌سازی با تایم‌استمپ (تصحیح زمان)
-    // ================================================================
-
-    function syncToServerTime(serverTime, serverCurrentTime, isPlaying) {
-        const now = performance.now();
-        // محاسبه اختلاف زمان سرور و کلاینت
-        const estimatedServerNow = serverTime + (now - lastSyncTime);
-        const offset = estimatedServerNow - now;
-        serverTimeOffset = offset;
-
-        // زمان هدف = زمان فعلی سرور + اختلاف
-        const targetTime = serverCurrentTime + (now - lastSyncTime) / 1000;
-        // محدود کردن به duration
-        const duration = getDuration() || Infinity;
-        const clampedTime = Math.min(targetTime, duration - 0.5);
-
-        if (!isSyncing) {
-            isSyncing = true;
-            seekVideo(clampedTime);
-            if (isPlaying) {
-                playVideo().catch(e => {});
-            } else {
-                pauseVideo();
-            }
-            setTimeout(() => { isSyncing = false; }, 200);
-        }
-        updateUI();
+    function updateUI() {
+        const time = getCurrentTime();
+        timeDisplay.textContent = formatTime(time);
     }
 
-    // ================================================================
-    //  درخواست همگام‌سازی دوره‌ای (هر ۳ ثانیه)
-    // ================================================================
-
-    function requestSync() {
-        if (!roomId) return;
-        const clientTime = performance.now();
-        socket.emit('sync-request', { roomId, clientTime });
+    function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
-
-    socket.on('sync-response', (data) => {
-        const { currentTime, isPlaying, serverTime, clientTime } = data;
-        const now = performance.now();
-        const rtt = now - clientTime; // تأخیر رفت و برگشت
-        const adjustedServerTime = serverTime + rtt / 2;
-        syncToServerTime(adjustedServerTime, currentTime, isPlaying);
-    });
 
     // ================================================================
     //  ساخت اتاق
@@ -599,11 +520,8 @@
         if (!url) { alert('لطفاً یک لینک ویدیو معتبر وارد کنید.'); return; }
         const newRoomId = Math.random().toString(36).substring(2, 8);
         roomId = newRoomId;
-        videoUrl = url;
-        isHost = true;
-
         socket.emit('join-room', roomId);
-        socket.emit('set-video', { roomId, videoUrl });
+        socket.emit('set-video', { roomId, videoUrl: url });
 
         const fullLink = `${window.location.origin}?room=${roomId}`;
         roomLinkDisplay.textContent = fullLink;
@@ -615,10 +533,6 @@
 
         await loadVideo(url);
         statusDisplay.innerHTML = `🎬 اتاق ساخته شد! کد: <span class="highlight">${roomId}</span>`;
-
-        // شروع همگام‌سازی دوره‌ای
-        if (syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(requestSync, 3000);
     });
 
     // ================================================================
@@ -648,7 +562,6 @@
         const code = roomInput.value.trim();
         if (!code) { alert('لطفاً کد اتاق را وارد کنید.'); return; }
         roomId = code;
-        isHost = false;
         socket.emit('join-room', roomId);
 
         step1.style.display = 'none';
@@ -656,54 +569,56 @@
         playerSection.classList.remove('hidden');
 
         statusDisplay.innerHTML = `⏳ در حال اتصال به اتاق <span class="highlight">${roomId}</span>...`;
-
-        if (syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(requestSync, 3000);
     });
 
     // ================================================================
-    //  رویدادهای Socket
+    //  رویدادهای دریافتی از سرور
     // ================================================================
 
-    socket.on('room-state', async (state) => {
-        console.log('📦 وضعیت اتاق:', state);
-        if (state.videoUrl) {
-            videoUrl = state.videoUrl;
-            const currentIsYoutube = isYoutube;
-            const newIsYoutube = isYoutubeUrl(videoUrl);
-            if (newIsYoutube !== currentIsYoutube || (newIsYoutube && !youtubePlayer)) {
-                await loadVideo(videoUrl);
-            } else if (!newIsYoutube && videoPlayer.src !== videoUrl) {
-                videoPlayer.src = videoUrl;
-                videoPlayer.load();
-            }
+    socket.on('video-set', (url) => {
+        if (videoPlayer.src !== url && !isYoutube) {
+            loadVideo(url);
         }
-        // همگام‌سازی با تایم‌استمپ سرور
-        lastSyncTime = performance.now();
-        syncToServerTime(state.serverTime, state.currentTime, state.isPlaying);
-        updateUI(state);
     });
 
-    socket.on('video-set', async (data) => {
-        videoUrl = data.videoUrl;
-        await loadVideo(videoUrl);
-        lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, 0, false);
+    socket.on('video-play', (time) => {
+        if (!isSyncing) {
+            isSyncing = true;
+            if (isYoutube && youtubePlayer) {
+                youtubePlayer.seekTo(time, true);
+                youtubePlayer.playVideo();
+            } else {
+                videoPlayer.currentTime = time;
+                videoPlayer.play();
+            }
+            setTimeout(() => { isSyncing = false; }, 100);
+        }
     });
 
-    socket.on('play', (data) => {
-        lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, true);
+    socket.on('video-pause', (time) => {
+        if (!isSyncing) {
+            isSyncing = true;
+            if (isYoutube && youtubePlayer) {
+                youtubePlayer.seekTo(time, true);
+                youtubePlayer.pauseVideo();
+            } else {
+                videoPlayer.currentTime = time;
+                videoPlayer.pause();
+            }
+            setTimeout(() => { isSyncing = false; }, 100);
+        }
     });
 
-    socket.on('pause', (data) => {
-        lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, false);
-    });
-
-    socket.on('seek', (data) => {
-        lastSyncTime = performance.now();
-        syncToServerTime(data.serverTime, data.time, false);
+    socket.on('video-seek', (time) => {
+        if (!isSyncing) {
+            isSyncing = true;
+            if (isYoutube && youtubePlayer) {
+                youtubePlayer.seekTo(time, true);
+            } else {
+                videoPlayer.currentTime = time;
+            }
+            setTimeout(() => { isSyncing = false; }, 100);
+        }
     });
 
     socket.on('user-count', (count) => {
@@ -712,7 +627,7 @@
     });
 
     // ================================================================
-    //  پیام‌های چت
+    //  چت
     // ================================================================
 
     socket.on('chat-message', (data) => {
@@ -729,59 +644,6 @@
             chatMessages.removeChild(chatMessages.firstChild);
         }
     });
-
-    // ================================================================
-    //  رویدادهای ویدیو (برای نوع معمولی)
-    // ================================================================
-
-    videoPlayer.addEventListener('play', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('play', { roomId, time: videoPlayer.currentTime });
-        }
-    });
-    videoPlayer.addEventListener('pause', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('pause', { roomId, time: videoPlayer.currentTime });
-        }
-    });
-    videoPlayer.addEventListener('seeked', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('seek', { roomId, time: videoPlayer.currentTime });
-        }
-        updateUI();
-    });
-    videoPlayer.addEventListener('timeupdate', () => {
-        updateUI();
-    });
-
-    // ================================================================
-    //  دکمه‌ها
-    // ================================================================
-
-    playBtn.addEventListener('click', playVideo);
-    pauseBtn.addEventListener('click', pauseVideo);
-    backBtn.addEventListener('click', () => {
-        const t = Math.max(0, getCurrentTime() - 5);
-        seekVideo(t);
-        if (roomId) socket.emit('seek', { roomId, time: t });
-    });
-    forwardBtn.addEventListener('click', () => {
-        const t = Math.min(getDuration() || 0, getCurrentTime() + 5);
-        seekVideo(t);
-        if (roomId) socket.emit('seek', { roomId, time: t });
-    });
-
-    leaveBtn.addEventListener('click', () => {
-        if (confirm('آیا مطمئن هستید که می‌خواهید از اتاق خارج شوید؟')) {
-            if (syncInterval) clearInterval(syncInterval);
-            socket.disconnect();
-            location.reload();
-        }
-    });
-
-    // ================================================================
-    //  چت (متن و ایموجی)
-    // ================================================================
 
     function sendChatMessage(message) {
         const msg = message || chatInput.value.trim();
@@ -815,23 +677,77 @@
     });
 
     // ================================================================
-    //  به‌روزرسانی UI
+    //  رویدادهای ویدیو (ارسال به سرور)
     // ================================================================
 
-    function updateUI(state) {
-        const time = getCurrentTime();
-        timeDisplay.textContent = formatTime(time);
-        if (state && state.users) {
-            userCount.textContent = state.users.length || 0;
-            chatUserCount.textContent = state.users.length || 0;
+    // برای ویدیوی معمولی
+    videoPlayer.addEventListener('play', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('video-play', { roomId, time: videoPlayer.currentTime });
         }
-    }
+    });
 
-    function formatTime(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
+    videoPlayer.addEventListener('pause', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('video-pause', { roomId, time: videoPlayer.currentTime });
+        }
+    });
+
+    videoPlayer.addEventListener('seeked', () => {
+        if (!isSyncing && roomId && !isYoutube) {
+            socket.emit('video-seek', { roomId, time: videoPlayer.currentTime });
+        }
+        updateUI();
+    });
+
+    videoPlayer.addEventListener('timeupdate', updateUI);
+
+    // ================================================================
+    //  دکمه‌های اضافی (عقب/جلو)
+    // ================================================================
+
+    playBtn.addEventListener('click', () => {
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.playVideo();
+        } else {
+            videoPlayer.play();
+        }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.pauseVideo();
+        } else {
+            videoPlayer.pause();
+        }
+    });
+
+    backBtn.addEventListener('click', () => {
+        const t = Math.max(0, getCurrentTime() - 5);
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.seekTo(t, true);
+        } else {
+            videoPlayer.currentTime = t;
+        }
+        if (roomId) socket.emit('video-seek', { roomId, time: t });
+    });
+
+    forwardBtn.addEventListener('click', () => {
+        const t = Math.min(getDuration() || 0, getCurrentTime() + 5);
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.seekTo(t, true);
+        } else {
+            videoPlayer.currentTime = t;
+        }
+        if (roomId) socket.emit('video-seek', { roomId, time: t });
+    });
+
+    leaveBtn.addEventListener('click', () => {
+        if (confirm('آیا مطمئن هستید که می‌خواهید از اتاق خارج شوید؟')) {
+            socket.disconnect();
+            location.reload();
+        }
+    });
 
     // ================================================================
     //  ورود مستقیم از لینک
@@ -847,7 +763,7 @@
         }
     })();
 
-    console.log('🎬 سینمای هم‌زمان Real-Time با تایم‌استمپ راه‌اندازی شد!');
+    console.log('🎬 سینمای هم‌زمان (نسخه رویدادمحور) راه‌اندازی شد!');
 </script>
 </body>
 </html>
