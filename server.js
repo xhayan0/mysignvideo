@@ -15,118 +15,57 @@ io.on('connection', (socket) => {
   console.log('🔗 کاربر متصل شد:', socket.id);
 
   socket.on('join-room', (roomId) => {
-    if (!roomId || typeof roomId !== 'string') {
-      console.log('⚠️ roomId نامعتبر:', roomId);
-      return;
-    }
-
+    if (!roomId) return;
     if (!rooms[roomId]) {
       rooms[roomId] = {
-        videoUrl: null,
-        currentTime: 0,
-        isPlaying: false,
         users: [],
         chatHistory: [],
-        lastSyncTime: Date.now(),
       };
     }
-
     socket.join(roomId);
     rooms[roomId].users.push(socket.id);
-    console.log(`👤 کاربر ${socket.id} به اتاق ${roomId} پیوست (${rooms[roomId].users.length} نفر)`);
-
-    const room = rooms[roomId];
-    // ارسال وضعیت با تایم‌استمپ سرور
-    socket.emit('room-state', {
-      videoUrl: room.videoUrl,
-      currentTime: room.currentTime,
-      isPlaying: room.isPlaying,
-      users: room.users,
-      serverTime: Date.now(),
-    });
+    console.log(`👤 کاربر ${socket.id} به اتاق ${roomId} پیوست`);
 
     // ارسال تاریخچه چت
-    if (room.chatHistory && room.chatHistory.length > 0) {
-      for (const msg of room.chatHistory.slice(-20)) {
+    if (rooms[roomId].chatHistory.length > 0) {
+      for (const msg of rooms[roomId].chatHistory.slice(-20)) {
         socket.emit('chat-message', msg);
       }
     }
-
-    io.to(roomId).emit('user-count', room.users.length);
-    socket.to(roomId).emit('user-joined', socket.id);
+    io.to(roomId).emit('user-count', rooms[roomId].users.length);
   });
 
-  // تنظیم ویدیو
+  // ---------- رویدادهای ویدیو (فقط پخش به دیگران) ----------
+  socket.on('video-play', ({ roomId, time }) => {
+    if (!roomId || !rooms[roomId]) return;
+    socket.to(roomId).emit('video-play', time);
+  });
+
+  socket.on('video-pause', ({ roomId, time }) => {
+    if (!roomId || !rooms[roomId]) return;
+    socket.to(roomId).emit('video-pause', time);
+  });
+
+  socket.on('video-seek', ({ roomId, time }) => {
+    if (!roomId || !rooms[roomId]) return;
+    socket.to(roomId).emit('video-seek', time);
+  });
+
+  // ---------- تنظیم ویدیو (وقتی کاربر اول لینک را وارد می‌کند) ----------
   socket.on('set-video', ({ roomId, videoUrl }) => {
     if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].videoUrl = videoUrl;
-    rooms[roomId].currentTime = 0;
-    rooms[roomId].isPlaying = false;
-    rooms[roomId].lastSyncTime = Date.now();
-    io.to(roomId).emit('video-set', { videoUrl, serverTime: Date.now() });
-    console.log(`🎬 ویدیو برای اتاق ${roomId} تنظیم شد`);
+    socket.to(roomId).emit('video-set', videoUrl);
   });
 
-  // پخش
-  socket.on('play', ({ roomId, time }) => {
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].isPlaying = true;
-    rooms[roomId].currentTime = time || 0;
-    rooms[roomId].lastSyncTime = Date.now();
-    socket.to(roomId).emit('play', {
-      time: rooms[roomId].currentTime,
-      serverTime: Date.now(),
-    });
-  });
-
-  // توقف
-  socket.on('pause', ({ roomId, time }) => {
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].isPlaying = false;
-    rooms[roomId].currentTime = time || 0;
-    rooms[roomId].lastSyncTime = Date.now();
-    socket.to(roomId).emit('pause', {
-      time: rooms[roomId].currentTime,
-      serverTime: Date.now(),
-    });
-  });
-
-  // سیك
-  socket.on('seek', ({ roomId, time }) => {
-    if (!roomId || !rooms[roomId]) return;
-    rooms[roomId].currentTime = time || 0;
-    rooms[roomId].lastSyncTime = Date.now();
-    socket.to(roomId).emit('seek', {
-      time: rooms[roomId].currentTime,
-      serverTime: Date.now(),
-    });
-  });
-
-  // چت
+  // ---------- چت ----------
   socket.on('chat-message', ({ roomId, username, message, time }) => {
     if (!roomId || !rooms[roomId]) return;
-    const msgData = {
-      username: username || 'ناشناس',
-      message: message || '',
-      time: time || new Date().toLocaleTimeString('fa-IR'),
-    };
+    const msgData = { username, message, time };
     rooms[roomId].chatHistory.push(msgData);
     if (rooms[roomId].chatHistory.length > 100) {
       rooms[roomId].chatHistory.shift();
     }
     io.to(roomId).emit('chat-message', msgData);
-  });
-
-  // درخواست همگام‌سازی (برای جلوگیری از انحراف)
-  socket.on('sync-request', ({ roomId, clientTime }) => {
-    if (!roomId || !rooms[roomId]) return;
-    const room = rooms[roomId];
-    socket.emit('sync-response', {
-      currentTime: room.currentTime,
-      isPlaying: room.isPlaying,
-      serverTime: Date.now(),
-      clientTime: clientTime,
-    });
   });
 
   socket.on('disconnect', () => {
@@ -138,7 +77,7 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('user-count', rooms[roomId].users.length);
         if (rooms[roomId].users.length === 0) {
           delete rooms[roomId];
-          console.log(`🧹 اتاق ${roomId} خالی شد و حذف گردید`);
+          console.log(`🧹 اتاق ${roomId} خالی شد`);
         }
         break;
       }
