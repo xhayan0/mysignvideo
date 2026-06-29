@@ -5,10 +5,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  pingInterval: 1000,   // هر ۱ ثانیه پینگ برای کاهش تأخیر
-  pingTimeout: 5000,
-});
+const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -18,7 +15,10 @@ io.on('connection', (socket) => {
   console.log('🔗 کاربر متصل شد:', socket.id);
 
   socket.on('join-room', (roomId) => {
-    if (!roomId || typeof roomId !== 'string') return;
+    if (!roomId || typeof roomId !== 'string') {
+      console.log('⚠️ roomId نامعتبر:', roomId);
+      return;
+    }
 
     if (!rooms[roomId]) {
       rooms[roomId] = {
@@ -36,7 +36,7 @@ io.on('connection', (socket) => {
     console.log(`👤 کاربر ${socket.id} به اتاق ${roomId} پیوست (${rooms[roomId].users.length} نفر)`);
 
     const room = rooms[roomId];
-    // ارسال وضعیت کامل با تایم‌استمپ سرور
+    // ارسال وضعیت با تایم‌استمپ سرور
     socket.emit('room-state', {
       videoUrl: room.videoUrl,
       currentTime: room.currentTime,
@@ -63,11 +63,7 @@ io.on('connection', (socket) => {
     rooms[roomId].currentTime = 0;
     rooms[roomId].isPlaying = false;
     rooms[roomId].lastSyncTime = Date.now();
-    io.to(roomId).emit('video-set', {
-      videoUrl,
-      serverTime: Date.now(),
-      currentTime: 0,
-    });
+    io.to(roomId).emit('video-set', { videoUrl, serverTime: Date.now() });
     console.log(`🎬 ویدیو برای اتاق ${roomId} تنظیم شد`);
   });
 
@@ -77,7 +73,7 @@ io.on('connection', (socket) => {
     rooms[roomId].isPlaying = true;
     rooms[roomId].currentTime = time || 0;
     rooms[roomId].lastSyncTime = Date.now();
-    io.to(roomId).emit('play', {
+    socket.to(roomId).emit('play', {
       time: rooms[roomId].currentTime,
       serverTime: Date.now(),
     });
@@ -89,7 +85,7 @@ io.on('connection', (socket) => {
     rooms[roomId].isPlaying = false;
     rooms[roomId].currentTime = time || 0;
     rooms[roomId].lastSyncTime = Date.now();
-    io.to(roomId).emit('pause', {
+    socket.to(roomId).emit('pause', {
       time: rooms[roomId].currentTime,
       serverTime: Date.now(),
     });
@@ -100,7 +96,7 @@ io.on('connection', (socket) => {
     if (!roomId || !rooms[roomId]) return;
     rooms[roomId].currentTime = time || 0;
     rooms[roomId].lastSyncTime = Date.now();
-    io.to(roomId).emit('seek', {
+    socket.to(roomId).emit('seek', {
       time: rooms[roomId].currentTime,
       serverTime: Date.now(),
     });
@@ -121,7 +117,7 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chat-message', msgData);
   });
 
-  // درخواست همگام‌سازی (با پاسخ سریع)
+  // درخواست همگام‌سازی (برای جلوگیری از انحراف)
   socket.on('sync-request', ({ roomId, clientTime }) => {
     if (!roomId || !rooms[roomId]) return;
     const room = rooms[roomId];
