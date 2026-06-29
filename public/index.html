@@ -81,6 +81,10 @@
             background: #e74c3c;
             color: #fff;
         }
+        .btn-host {
+            background: #4caf50;
+            color: #fff;
+        }
         .video-wrapper {
             background: #000;
             border-radius: 16px;
@@ -260,6 +264,23 @@
         .emoji-btn:active { transform: scale(0.9); }
         .hidden { display: none; }
 
+        .role-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .role-host {
+            background: #4caf50;
+            color: #fff;
+        }
+        .role-guest {
+            background: #555;
+            color: #ddd;
+        }
+
         @media (max-width: 550px) {
             body { padding: 6px; }
             .container { padding: 14px 10px 20px; border-radius: 20px; }
@@ -290,13 +311,11 @@
 <body>
 
 <div class="container">
-    <!-- تیتر حذف شده -->
-
     <div id="step1" class="step">
         <h3>📥 لینک ویدیو یا یوتیوب را وارد کنید</h3>
         <div class="input-group">
             <input type="text" id="videoInput" placeholder="مثال: https://youtu.be/... یا https://example.com/video.mp4" />
-            <button class="btn" id="createRoomBtn">🚀 ساخت اتاق</button>
+            <button class="btn" id="createRoomBtn">🚀 ساخت اتاق (میزبان)</button>
         </div>
     </div>
 
@@ -310,17 +329,21 @@
         <h3>🔗 یا با کد اتاق وارد شوید</h3>
         <div class="input-group">
             <input type="text" id="roomInput" placeholder="کد اتاق (مثلاً abc123)" />
-            <button class="btn" id="joinRoomBtn">🔓 ورود</button>
+            <button class="btn" id="joinRoomBtn">🔓 ورود (تماشاچی)</button>
         </div>
     </div>
 
     <div id="playerSection" class="hidden">
+        <div style="text-align:center; margin-bottom:6px;">
+            <span id="roleBadge" class="role-badge role-guest">👤 تماشاچی</span>
+        </div>
+
         <div class="video-wrapper" id="videoWrapper">
             <video id="videoPlayer" controls controlsList="nodownload" disablePictureInPicture style="display:none;"></video>
             <div id="youtube-player" style="display:none;"></div>
         </div>
 
-        <div class="controls">
+        <div class="controls" id="controlsContainer">
             <button class="btn" id="playBtn">▶ پلی</button>
             <button class="btn btn-secondary" id="pauseBtn">⏸ استپ</button>
             <button class="btn btn-secondary" id="backBtn">⏪ ۵-</button>
@@ -362,16 +385,17 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     // ================================================================
-    //  کلاینت ساده – فقط ارسال و دریافت رویدادها
+    //  کلاینت میزبان-محور
     // ================================================================
 
     const socket = io();
     let roomId = null;
     let username = 'کاربر' + Math.floor(Math.random() * 1000);
+    let isHost = false;
     let isYoutube = false;
     let youtubePlayer = null;
     let youtubeReady = false;
-    let isSyncing = false; // جلوگیری از حلقه
+    let isApplyingState = false; // جلوگیری از حلقه
 
     // ===== المنت‌ها =====
     const videoInput = document.getElementById('videoInput');
@@ -398,6 +422,7 @@
     const chatInput = document.getElementById('chatInput');
     const sendChatBtn = document.getElementById('sendChatBtn');
     const chatUserCount = document.getElementById('chatUserCount');
+    const roleBadge = document.getElementById('roleBadge');
 
     // ================================================================
     //  توابع یوتیوب
@@ -444,17 +469,6 @@
                         youtubeReady = true;
                         resolve(youtubePlayer);
                     },
-                    onStateChange: (event) => {
-                        if (!isSyncing && roomId) {
-                            const state = event.data;
-                            const time = youtubePlayer.getCurrentTime();
-                            if (state === YT.PlayerState.PLAYING) {
-                                socket.emit('video-play', { roomId, time });
-                            } else if (state === YT.PlayerState.PAUSED) {
-                                socket.emit('video-pause', { roomId, time });
-                            }
-                        }
-                    },
                 }
             });
         });
@@ -500,6 +514,22 @@
         return videoPlayer.duration || 0;
     }
 
+    function setVideoState(time, isPlaying) {
+        if (isApplyingState) return;
+        isApplyingState = true;
+        if (isYoutube && youtubePlayer) {
+            youtubePlayer.seekTo(time, true);
+            if (isPlaying) youtubePlayer.playVideo();
+            else youtubePlayer.pauseVideo();
+        } else {
+            videoPlayer.currentTime = time;
+            if (isPlaying) videoPlayer.play();
+            else videoPlayer.pause();
+        }
+        setTimeout(() => { isApplyingState = false; }, 100);
+        updateUI();
+    }
+
     function updateUI() {
         const time = getCurrentTime();
         timeDisplay.textContent = formatTime(time);
@@ -512,7 +542,7 @@
     }
 
     // ================================================================
-    //  ساخت اتاق
+    //  ساخت اتاق (میزبان)
     // ================================================================
 
     createRoomBtn.addEventListener('click', async () => {
@@ -520,7 +550,9 @@
         if (!url) { alert('لطفاً یک لینک ویدیو معتبر وارد کنید.'); return; }
         const newRoomId = Math.random().toString(36).substring(2, 8);
         roomId = newRoomId;
-        socket.emit('join-room', roomId);
+        isHost = true;
+
+        socket.emit('create-room', roomId);
         socket.emit('set-video', { roomId, videoUrl: url });
 
         const fullLink = `${window.location.origin}?room=${roomId}`;
@@ -531,8 +563,13 @@
         step2.style.display = 'none';
         playerSection.classList.remove('hidden');
 
+        roleBadge.textContent = '👑 میزبان';
+        roleBadge.className = 'role-badge role-host';
+
         await loadVideo(url);
         statusDisplay.innerHTML = `🎬 اتاق ساخته شد! کد: <span class="highlight">${roomId}</span>`;
+        // دکمه‌های کنترل برای میزبان فعال است
+        document.querySelectorAll('#controlsContainer .btn').forEach(b => b.disabled = false);
     });
 
     // ================================================================
@@ -555,70 +592,52 @@
     });
 
     // ================================================================
-    //  ورود با کد
+    //  ورود با کد (تماشاچی)
     // ================================================================
 
     joinRoomBtn.addEventListener('click', async () => {
         const code = roomInput.value.trim();
         if (!code) { alert('لطفاً کد اتاق را وارد کنید.'); return; }
         roomId = code;
+        isHost = false;
         socket.emit('join-room', roomId);
 
         step1.style.display = 'none';
         step2.style.display = 'none';
         playerSection.classList.remove('hidden');
 
-        statusDisplay.innerHTML = `⏳ در حال اتصال به اتاق <span class="highlight">${roomId}</span>...`;
+        roleBadge.textContent = '👤 تماشاچی';
+        roleBadge.className = 'role-badge role-guest';
+        // غیرفعال کردن کنترل‌ها برای تماشاچی
+        document.querySelectorAll('#controlsContainer .btn').forEach(b => b.disabled = true);
+
+        statusDisplay.innerHTML = `⏳ در حال اتصال به اتاق <span class="highlight">${code}</span>...`;
     });
 
     // ================================================================
     //  رویدادهای دریافتی از سرور
     // ================================================================
 
-    socket.on('video-set', (url) => {
-        if (videoPlayer.src !== url && !isYoutube) {
-            loadVideo(url);
+    socket.on('host-status', (status) => {
+        isHost = status;
+        if (isHost) {
+            roleBadge.textContent = '👑 میزبان';
+            roleBadge.className = 'role-badge role-host';
+            document.querySelectorAll('#controlsContainer .btn').forEach(b => b.disabled = false);
         }
     });
 
-    socket.on('video-play', (time) => {
-        if (!isSyncing) {
-            isSyncing = true;
-            if (isYoutube && youtubePlayer) {
-                youtubePlayer.seekTo(time, true);
-                youtubePlayer.playVideo();
-            } else {
-                videoPlayer.currentTime = time;
-                videoPlayer.play();
+    socket.on('sync-state', async (state) => {
+        console.log('📦 وضعیت جدید:', state);
+        if (state.videoUrl) {
+            // اگر ویدیو عوض شده، بارگذاری کن
+            const currentUrl = isYoutube ? youtubePlayer?.getVideoUrl() : videoPlayer.src;
+            if (!currentUrl || currentUrl !== state.videoUrl) {
+                await loadVideo(state.videoUrl);
             }
-            setTimeout(() => { isSyncing = false; }, 100);
         }
-    });
-
-    socket.on('video-pause', (time) => {
-        if (!isSyncing) {
-            isSyncing = true;
-            if (isYoutube && youtubePlayer) {
-                youtubePlayer.seekTo(time, true);
-                youtubePlayer.pauseVideo();
-            } else {
-                videoPlayer.currentTime = time;
-                videoPlayer.pause();
-            }
-            setTimeout(() => { isSyncing = false; }, 100);
-        }
-    });
-
-    socket.on('video-seek', (time) => {
-        if (!isSyncing) {
-            isSyncing = true;
-            if (isYoutube && youtubePlayer) {
-                youtubePlayer.seekTo(time, true);
-            } else {
-                videoPlayer.currentTime = time;
-            }
-            setTimeout(() => { isSyncing = false; }, 100);
-        }
+        setVideoState(state.currentTime || 0, state.isPlaying);
+        statusDisplay.innerHTML = `👥 <span id="userCount">${state.userCount || 0}</span> نفر آنلاین | ⏱ <span id="timeDisplay">${formatTime(state.currentTime || 0)}</span>`;
     });
 
     socket.on('user-count', (count) => {
@@ -677,70 +696,73 @@
     });
 
     // ================================================================
-    //  رویدادهای ویدیو (ارسال به سرور)
-    // ================================================================
-
-    // برای ویدیوی معمولی
-    videoPlayer.addEventListener('play', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('video-play', { roomId, time: videoPlayer.currentTime });
-        }
-    });
-
-    videoPlayer.addEventListener('pause', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('video-pause', { roomId, time: videoPlayer.currentTime });
-        }
-    });
-
-    videoPlayer.addEventListener('seeked', () => {
-        if (!isSyncing && roomId && !isYoutube) {
-            socket.emit('video-seek', { roomId, time: videoPlayer.currentTime });
-        }
-        updateUI();
-    });
-
-    videoPlayer.addEventListener('timeupdate', updateUI);
-
-    // ================================================================
-    //  دکمه‌های اضافی (عقب/جلو)
+    //  رویدادهای کنترل (فقط میزبان)
     // ================================================================
 
     playBtn.addEventListener('click', () => {
+        if (!isHost || !roomId) return;
         if (isYoutube && youtubePlayer) {
             youtubePlayer.playVideo();
+            const time = youtubePlayer.getCurrentTime();
+            socket.emit('host-play', { roomId, time });
         } else {
             videoPlayer.play();
+            socket.emit('host-play', { roomId, time: videoPlayer.currentTime });
         }
     });
 
     pauseBtn.addEventListener('click', () => {
+        if (!isHost || !roomId) return;
         if (isYoutube && youtubePlayer) {
             youtubePlayer.pauseVideo();
+            const time = youtubePlayer.getCurrentTime();
+            socket.emit('host-pause', { roomId, time });
         } else {
             videoPlayer.pause();
+            socket.emit('host-pause', { roomId, time: videoPlayer.currentTime });
         }
     });
 
     backBtn.addEventListener('click', () => {
+        if (!isHost || !roomId) return;
         const t = Math.max(0, getCurrentTime() - 5);
         if (isYoutube && youtubePlayer) {
             youtubePlayer.seekTo(t, true);
         } else {
             videoPlayer.currentTime = t;
         }
-        if (roomId) socket.emit('video-seek', { roomId, time: t });
+        socket.emit('host-seek', { roomId, time: t });
     });
 
     forwardBtn.addEventListener('click', () => {
+        if (!isHost || !roomId) return;
         const t = Math.min(getDuration() || 0, getCurrentTime() + 5);
         if (isYoutube && youtubePlayer) {
             youtubePlayer.seekTo(t, true);
         } else {
             videoPlayer.currentTime = t;
         }
-        if (roomId) socket.emit('video-seek', { roomId, time: t });
+        socket.emit('host-seek', { roomId, time: t });
     });
+
+    // برای ویدیوی معمولی (اگر میزبان از کنترل‌های مرورگر استفاده کند)
+    videoPlayer.addEventListener('play', () => {
+        if (isHost && roomId && !isYoutube && !isApplyingState) {
+            socket.emit('host-play', { roomId, time: videoPlayer.currentTime });
+        }
+    });
+    videoPlayer.addEventListener('pause', () => {
+        if (isHost && roomId && !isYoutube && !isApplyingState) {
+            socket.emit('host-pause', { roomId, time: videoPlayer.currentTime });
+        }
+    });
+    videoPlayer.addEventListener('seeked', () => {
+        if (isHost && roomId && !isYoutube && !isApplyingState) {
+            socket.emit('host-seek', { roomId, time: videoPlayer.currentTime });
+        }
+        updateUI();
+    });
+    videoPlayer.addEventListener('timeupdate', updateUI);
 
     leaveBtn.addEventListener('click', () => {
         if (confirm('آیا مطمئن هستید که می‌خواهید از اتاق خارج شوید؟')) {
@@ -763,7 +785,7 @@
         }
     })();
 
-    console.log('🎬 سینمای هم‌زمان (نسخه رویدادمحور) راه‌اندازی شد!');
+    console.log('🎬 سینمای هم‌زمان (میزبان-محور) راه‌اندازی شد!');
 </script>
 </body>
 </html>
