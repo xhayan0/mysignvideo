@@ -1,7 +1,7 @@
 {
-  "name": "sync-video",
+  "name": "sync-video-host",
   "version": "1.0.0",
-  "description": "تماشای هم‌زمان ویدیو با دیگران (یوتیوب + چت + ایموجی)",
+  "description": "سینمای هم‌زمان با کنترل میزبان (Host-Controlled)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
